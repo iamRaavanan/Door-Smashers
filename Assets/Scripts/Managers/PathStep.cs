@@ -8,7 +8,7 @@ namespace Raavanan
     public class PathStep
     {
         public Vector3 targetPosition_;
-
+        public int eventBound;
         public PathStep (Vector3 pTargetPosition)
         {
             targetPosition_ = pTargetPosition;

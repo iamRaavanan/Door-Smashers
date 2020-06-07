@@ -8,6 +8,7 @@ namespace Raavanan
     public class UnitController : MonoBehaviour
     {
         #region Public Variables
+        public List<PathStep> pathSteps_ = new List<PathStep>();
         
         #endregion
 
@@ -23,7 +24,6 @@ namespace Raavanan
 
         private int mStepIndex;
 
-        private List<PathStep> mPathSteps = new List<PathStep>();
         #endregion
 
         private void Start()
@@ -35,7 +35,6 @@ namespace Raavanan
                 mPathView = GO.GetComponent<LineRenderer>();
                 InputManager.instance.RegisterUnits(this);
             }
-            AddSteps(transform.position);
         }
 
         private void Update()
@@ -47,11 +46,10 @@ namespace Raavanan
                     if (mAgent.remainingDistance < mAgent.stoppingDistance)
                     {
                         mIsMovementActive = false;
-                        if (mPathSteps.Count > 0)
+                        if (pathSteps_.Count > 0)
                         {
                             mAgent.ResetPath();
-                            MoveToPosition(mPathSteps[0].targetPosition_);
-                            mPathSteps.RemoveAt(0);
+                            ExecuteSteps(0);
                         }
                     }
                 }
@@ -64,20 +62,25 @@ namespace Raavanan
             }
         }
 
-        public void ExecuteSteps ()
+        public void ExecuteSteps (int pBounds)
         {
-            MoveToPosition(mPathSteps[0].targetPosition_);
-            mPathSteps.RemoveAt(0);
+            if (pathSteps_.Count == 0)
+                return;
+            if (pathSteps_[0].eventBound == pBounds)
+            {
+                MoveToPosition(pathSteps_[0].targetPosition_);
+                pathSteps_.RemoveAt(0);
+            }
         }
 
         public void AddSteps (Vector3 targetPos_)
         {
             float distance = 0f;
-            if (mPathSteps.Count > 0)
-                distance = Vector3.Distance(targetPos_, mPathSteps[mPathSteps.Count - 1].targetPosition_);
-            if (mPathSteps.Count == 0 || distance > mAgent.stoppingDistance)
+            if (pathSteps_.Count > 0)
+                distance = Vector3.Distance(targetPos_, pathSteps_[pathSteps_.Count - 1].targetPosition_);
+            if (pathSteps_.Count == 0 || distance > mAgent.stoppingDistance)
             {
-                mPathSteps.Add(new PathStep(targetPos_));
+                pathSteps_.Add(new PathStep(targetPos_));
                 UpdatePathView();
             }
         }
@@ -85,10 +88,10 @@ namespace Raavanan
         private void UpdatePathView()
         {
             Vector3 offset = Vector3.up * 0.1f;
-            mPathView.positionCount = mPathSteps.Count;
-            for (int i = 0; i < mPathSteps.Count; i++)
+            mPathView.positionCount = pathSteps_.Count;
+            for (int i = 0; i < pathSteps_.Count; i++)
             {
-                mPathView.SetPosition(i, mPathSteps[i].targetPosition_ + offset);
+                mPathView.SetPosition(i, pathSteps_[i].targetPosition_ + offset);
             }
         }
 

@@ -2,15 +2,16 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.EventSystems;
 
 namespace Raavanan
 {
     public class InputManager : MonoBehaviour
     {
         public static InputManager instance;
+        public Transform mStepOverlayUI;
         private UnitController mSelectedUnit;
         private List<UnitController> mPlayerUnits = new List<UnitController>();
-
         private void Awake()
         {
             instance = this;
@@ -23,6 +24,9 @@ namespace Raavanan
 
         private void Update()
         {
+            EventSystem currentSystem = EventSystem.current;
+            if (currentSystem.IsPointerOverGameObject())
+                return;
             if (Input.GetMouseButtonDown(0))
             {
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -33,6 +37,7 @@ namespace Raavanan
                     if (InUnitController != null)
                     {
                         mSelectedUnit = InUnitController;
+                        mStepOverlayUI.gameObject.SetActive(false);
                     }
                     else
                     {
@@ -41,6 +46,8 @@ namespace Raavanan
                             NavMeshHit nHit;
                             if (NavMesh.SamplePosition(hit.point, out nHit, 1, NavMesh.AllAreas))
                             {
+                                mStepOverlayUI.transform.position = Input.mousePosition;
+                                mStepOverlayUI.gameObject.SetActive(true);
                                 mSelectedUnit.AddSteps(nHit.position);
                             }
                         }
@@ -49,12 +56,25 @@ namespace Raavanan
             }
         }
 
-        public void ExecuteSteps ()
+        public void ExecuteSteps (int pEventBound)
         {
             for (int i = 0; i < mPlayerUnits.Count; i++)
             {
-                mPlayerUnits[i].ExecuteSteps();
+                mPlayerUnits[i].transform.position += (Vector3.forward * 0.0001f).normalized;
+                mPlayerUnits[i].ExecuteSteps(pEventBound);
             }
+        }
+
+        public void SetStepToEvent (int pEventbound)
+        {
+            if (mSelectedUnit != null)
+            {
+                GameObject GO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(GO.GetComponent<SphereCollider>());
+                GO.transform.localScale = Vector3.one * 0.1f;
+                GO.transform.position = mSelectedUnit.pathSteps_[mSelectedUnit.pathSteps_.Count - 1].targetPosition_ + Vector3.up;
+                mSelectedUnit.pathSteps_[mSelectedUnit.pathSteps_.Count - 1].eventBound = pEventbound;
+            }   
         }
     }
 }

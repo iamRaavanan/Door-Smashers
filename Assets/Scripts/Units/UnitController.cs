@@ -9,7 +9,7 @@ namespace Raavanan
     {
         #region Public Variables
         public List<PathStep> pathSteps_ = new List<PathStep>();
-        
+        public int nextStepEvent_ = 0;
         #endregion
 
         #region SerializedFields Variables
@@ -66,32 +66,54 @@ namespace Raavanan
         {
             if (pathSteps_.Count == 0)
                 return;
-            if (pathSteps_[0].eventBound == pBounds)
+            if (pathSteps_[0].eventBound_ == pBounds)
             {
                 MoveToPosition(pathSteps_[0].targetPosition_);
                 pathSteps_.RemoveAt(0);
             }
         }
 
-        public void AddSteps (Vector3 targetPos_)
+        public void AddSteps (Vector3 pTargetPos)
         {
             float distance = 0f;
+            Vector3 origin = transform.position;
             if (pathSteps_.Count > 0)
-                distance = Vector3.Distance(targetPos_, pathSteps_[pathSteps_.Count - 1].targetPosition_);
+            {
+                distance = Vector3.Distance(pTargetPos, pathSteps_[pathSteps_.Count - 1].targetPosition_);
+                origin = pathSteps_[pathSteps_.Count - 1].targetPosition_;
+            }
             if (pathSteps_.Count == 0 || distance > mAgent.stoppingDistance)
             {
-                pathSteps_.Add(new PathStep(targetPos_));
-                UpdatePathView();
+                PathStep ps = new PathStep(pTargetPos, new NavMeshPath());
+                if (NavMesh.CalculatePath(origin, pTargetPos, NavMesh.AllAreas, ps.path_))
+                {
+                    ps.eventBound_ = nextStepEvent_;
+                    nextStepEvent_ = 0;
+                    pathSteps_.Add(ps);
+                    UpdatePathView();
+                }
             }
         }
 
         private void UpdatePathView()
         {
             Vector3 offset = Vector3.up * 0.1f;
-            mPathView.positionCount = pathSteps_.Count;
+            List<Vector3> positions = new List<Vector3>();
+
             for (int i = 0; i < pathSteps_.Count; i++)
             {
-                mPathView.SetPosition(i, pathSteps_[i].targetPosition_ + offset);
+                Vector3[] corners = pathSteps_[i].path_.corners;
+                int length = corners.Length;
+                for (int index = 0;  index < length; index++)
+                {
+                    positions.Add(corners[index]);
+                    //mPathView.SetPosition(i, pathSteps_[i].targetPosition_ + offset);
+                }
+            }
+            mPathView.positionCount = positions.Count;
+            for (int i = 0; i < mPathView.positionCount; i++)
+            {
+                mPathView.SetPosition(i, positions[i] + offset);
             }
         }
 

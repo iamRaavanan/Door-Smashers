@@ -73,7 +73,7 @@ namespace Raavanan
                 Destroy(GO.GetComponent<SphereCollider>());
                 GO.transform.localScale = Vector3.one * 0.1f;
                 GO.transform.position = mSelectedUnit.pathSteps_[mSelectedUnit.pathSteps_.Count - 1].targetPosition_ + Vector3.up;
-                mSelectedUnit.pathSteps_[mSelectedUnit.pathSteps_.Count - 1].eventBound = pEventbound;
+                mSelectedUnit.nextStepEvent_ = pEventbound;
             }   
         }
     }

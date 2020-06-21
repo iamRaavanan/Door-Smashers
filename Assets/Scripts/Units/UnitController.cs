@@ -5,23 +5,31 @@ using UnityEngine.AI;
 
 namespace Raavanan
 {
-    public class UnitController : MonoBehaviour
+    public class UnitController : MonoBehaviour, IClickable
     {
         #region Public Variables
         public List<PathStep> pathSteps_ = new List<PathStep>();
         public int nextStepEvent_ = 0;
+        public bool isDead;
         #endregion
 
         #region SerializedFields Variables
         [SerializeField] private bool mIsPlayer;
         [SerializeField] private LineRenderer mPathView;
+        [SerializeField] private GameObject mHighlighterGO;
         #endregion
 
         #region Private Variables
         private NavMeshAgent mAgent;
-        
+        private PathStep mCurrentStep;
         private bool mIsMovementActive;
 
+        private UnitController mCurrentTarget;
+        private float mFOVRadius = 20;
+        private float mFOVAngle = 30;
+        private float mfireRate = 1;
+        private float mLastShot;
+        private LayerMask mControllerLayer;
         private int mStepIndex;
 
         #endregion
@@ -29,6 +37,8 @@ namespace Raavanan
         private void Start()
         {
             mAgent = GetComponent<NavMeshAgent>();
+            gameObject.layer = 8;
+            mControllerLayer = (1 << 8);
             if (mIsPlayer)
             {
                 GameObject GO = Instantiate(mPathView.gameObject) as GameObject;
@@ -39,6 +49,15 @@ namespace Raavanan
 
         private void Update()
         {
+            if (isDead)
+                return;
+            HandleMovement();
+            HandleDetection();
+            HandleAttack();
+        }
+
+        private void HandleMovement()
+        {
             if (mIsMovementActive)
             {
                 if (mAgent.hasPath)
@@ -46,6 +65,7 @@ namespace Raavanan
                     if (mAgent.remainingDistance < mAgent.stoppingDistance)
                     {
                         mIsMovementActive = false;
+                        Debug.Log(mCurrentStep.debugOnPathReach);
                         if (pathSteps_.Count > 0)
                         {
                             mAgent.ResetPath();
@@ -56,9 +76,85 @@ namespace Raavanan
                 Vector3 dVelocity = mAgent.desiredVelocity;
                 dVelocity = transform.InverseTransformVector(dVelocity);
             }
-            else
-            {
+        }
 
+        private void HandleDetection ()
+        {
+            if (mCurrentTarget == null)
+            {
+                Collider[] targets = Physics.OverlapSphere(transform.position, mFOVRadius, mControllerLayer);
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    UnitController controller = targets[i].GetComponent<UnitController>();
+                    if (controller != null)
+                    {
+                        if (controller.isDead)
+                            continue;
+                        Vector3 dir = controller.transform.position - transform.position;
+                        dir.Normalize();
+                        float angle = Vector3.Angle(dir, transform.forward);
+                        if (angle < mFOVAngle)
+                        {
+                            if (mIsPlayer)
+                            {
+                                if (!controller.mIsPlayer)
+                                {
+                                    CheckForOpponent(controller, dir);
+                                }
+                            }
+                            else
+                            {
+                                if (controller.mIsPlayer)
+                                {
+                                    //CheckForOpponent(controller, dir);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void HandleAttack ()
+        {
+            if(mCurrentTarget != null)
+            {
+                mAgent.updateRotation = false;
+                Vector3 dir = mCurrentTarget.transform.position - transform.position;
+                dir.y = 0;
+                dir.Normalize();
+                Quaternion targetRotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 3);
+                transform.rotation = targetRotation;
+
+                float angle = Vector3.Angle(transform.forward, dir);
+                if (angle < 5)
+                {
+                    if (Time.realtimeSinceStartup - mLastShot > mfireRate)
+                    {
+                        mLastShot = Time.realtimeSinceStartup;
+                        int random = UnityEngine.Random.Range(0, 10);
+                        if (random < 8)
+                        {
+                            mCurrentTarget.isDead = true;
+                            mCurrentTarget.gameObject.SetActive(false);
+                            mCurrentTarget = null;
+                            mAgent.updateRotation = true;
+                        }
+                    }
+                }
+            }
+        }
+        private void CheckForOpponent(UnitController controller, Vector3 dir)
+        {
+            RaycastHit hit;
+            Debug.DrawRay(transform.position + (Vector3.up * 0.5f), dir * 100);
+            if (Physics.Raycast(transform.position + (Vector3.up * 0.5f), dir, out hit, 100))
+            {
+                UnitController newController = hit.transform.GetComponent<UnitController>();
+                if (newController != null && !newController.mIsPlayer)
+                {
+                    mCurrentTarget = newController;
+                }
             }
         }
 
@@ -68,7 +164,8 @@ namespace Raavanan
                 return;
             if (pathSteps_[0].eventBound_ == pBounds)
             {
-                MoveToPosition(pathSteps_[0].targetPosition_);
+                mCurrentStep = pathSteps_[0];
+                MoveToPosition(mCurrentStep.targetPosition_);
                 pathSteps_.RemoveAt(0);
             }
         }
@@ -121,6 +218,17 @@ namespace Raavanan
         {
             mAgent.SetDestination(targetPos_);
             mIsMovementActive = true;
+        }
+
+        public void DeHighLightSelected()
+        {
+            mHighlighterGO.SetActive(false);
+        }
+
+        public void OnClick(InputManager inputManager)
+        {
+            mHighlighterGO.SetActive(true);
+            inputManager.AssignSelectedUnit(this);
         }
     }
 }
